@@ -17,9 +17,10 @@ function fixTitle(string $title): string {
 }
 
 # returns the fixed pathname of a given anime file
-function fixFile(string $oldPath): string {
+function fixFile(string $oldPath, $anime = true): string {
 	$path = pathinfo($oldPath);
-	return $path['dirname'].'/'.fixTitle($path['filename']).'.'.$path['extension'];
+	$fixed = $anime ? fixTitle($path['filename']) : fix_youtube_dl($path['filename']);
+	return $path['dirname'].'/'.$fixed.'.'.$path['extension'];
 }
 
 # returns a list of files and subdirectories in a directory
@@ -31,22 +32,22 @@ function getFiles(string $dir): array {
 }
 
 # returns ['file to fix' => 'fixed path'], ['files to be deleted']
-function fix(string $path): array {
+function fix(string $path, $anime = true): array {
 	$toFix = [];
 	$toDelete = [];
 	
 	if (is_file($path)) {
 		# queue to delete anything that isn't the right format
-		if (!in_array($extension = pathinfo($path, PATHINFO_EXTENSION), fileFormats))
+		if (!in_array($extension = pathinfo($path, PATHINFO_EXTENSION), fileFormats) && $anime)
 			$toDelete[] = $path;
-		else if (in_array($extension, animeFormats) && ($newPath = fixFile($path)) != $path)
+		else if (in_array($extension, animeFormats) && ($newPath = fixFile($path, $anime)) != $path)
 			$toFix[$path] = $newPath;
 	} else
 		# recursively check all of the subfolders & files
 		foreach (getFiles($path) as $subPath) {
-			list($toFix2, $toDelete2) = fix($subPath);
+			list($toFix2, $toDelete2) = fix($subPath, $anime);
 			$toFix = array_merge($toFix, $toFix2);
-			$toDelete = array_merge($toDelete, $toDelete2);
+			if ($anime) $toDelete = array_merge($toDelete, $toDelete2);
 		}
 	
 	return [$toFix, $toDelete];
@@ -91,7 +92,7 @@ function fixDirectory(string $dir): string {
 
 # makes a final pass to correct the folder names
 # returns ['folder' => 'fixed']
-function fixFolders(string $dir) {
+function fixFolders(string $dir): array {
 	$toFix = [];
 	if (($newDir = fixDirectory($dir)) != $dir)
 		$toFix[$dir] = $newDir;
@@ -103,30 +104,50 @@ function fixFolders(string $dir) {
 	return $toFix;
 }
 
+# use the fact that youtube_dl appends some 11 characters to the end of filename
+function fix_youtube_dl(string $filename): string {
+	return preg_replace('/-\S{11}$/', '', $filename);
+}
+
+function absolutePath(string $path): string {
+	return $path[0] !== '~' ? $path : posix_getpwuid(posix_getuid())['dir'].'/'.substr($path, 2);
+}
+
 # -------------------- main --------------------
 # TODO: accept command line arguments
 if (!debug_backtrace()) {
 	$error = '';
 	do {
-		$base = readline($error.'Directory or File to rename: ');
+		$base = absolutePath(readline($error.'Directory or File to rename: '));
 		$error = 'Not a valid file/directory path! ';
 	} while (!is_dir($base) && !is_file($base));
 	
-	$start = microtime(true);
-	list($toFix, $toDelete) = fix($base);
+	$error = '';
+	do {
+		$anime = readline($error.'Fix anime (t)orrents or (y)outube_dl downloads? ');
+		$error = 'Not a valid option! ';
+	} while ($anime != 't' && $anime != 'y');
 	
-	foreach ($toFix as $oldFile => $newFile)
-		rename($oldFile, $newFile);
-	foreach ($toDelete as $file)
-		unlink($file);
-	if (is_dir($base)) {
-		foreach (fixSingleFolders($base) as $oldFile => $newFile) {
+	$start = microtime(true);
+	list($toFix, $toDelete) = fix($base, $anime == 't');
+	
+	if ($anime == 't') {
+		foreach ($toFix as $oldFile => $newFile)
 			rename($oldFile, $newFile);
+		foreach ($toDelete as $file)
+			unlink($file);
+		if (is_dir($base)) {
+			foreach (fixSingleFolders($base) as $oldFile => $newFile) {
+				rename($oldFile, $newFile);
+			}
+			# TODO: fix 'No such file or directory' error (it still works, but will throw the error for some reason)
+			foreach (fixFolders($base) as $oldDir => $newDir)
+				rename($oldDir, $newDir);
+			# TODO: clear out any empty directories (I guess I'll have to make one more pass, huh)
 		}
-		# TODO: fix 'No such file or directory' error (it still works, but will throw the error for some reason)
-		foreach (fixFolders($base) as $oldDir => $newDir)
-			rename($oldDir, $newDir);
-		# TODO: clear out any empty directories (I guess I'll have to make one more pass, huh)
-	}
-	echo 'Took '.(microtime(true) - $start)." seconds.\n";
+	} else
+		foreach ($toFix as $oldFile => $newFile)
+			rename($oldFile, $newFile);
+	
+	echo 'Took '.round((microtime(true) - $start), 2)." seconds.\n";
 }

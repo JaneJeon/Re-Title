@@ -42,4 +42,25 @@ class AnimeTitleTest extends TestCase {
 		foreach ($titles as $before => $after)
 			$this->assertEquals(fixTitle($before), $after);
 	}
+	
+	public function test_fix_youtube_dl() {
+		$files = [
+			'Dark Souls 3 - Sunlight Cleric [v5] _ Silver Knight - PVP Guide #113-qXoVFUb8GaA' =>
+			'Dark Souls 3 - Sunlight Cleric [v5] _ Silver Knight - PVP Guide #113',
+			'Mission 5 - Capital Defense - Ace Combat Joint Assault - HD Walkthrough-oOPUeE8t3Hc' =>
+			'Mission 5 - Capital Defense - Ace Combat Joint Assault - HD Walkthrough',
+			'dm8m3yz2tof01' => 'dm8m3yz2tof01',
+			'AXSHN - Location (N2N & Vasta Remix)-BVBdqkHNl54' =>
+			'AXSHN - Location (N2N & Vasta Remix)',
+			'xauzwl9ryp4' => 'xauzwl9ryp4',
+			'chicken-with-bones-863810' => 'chicken-with-bones-863810',
+			'The  Legend of Zelda - Breath of the Wild by atz in 3_57_00 AGDQ 2018-tsUvZ9yiN_U' =>
+			'The  Legend of Zelda - Breath of the Wild by atz in 3_57_00 AGDQ 2018',
+			'Dark Souls 3 Encounter with a friendly chap-1VA5OP-I_Ls' =>
+			'Dark Souls 3 Encounter with a friendly chap'
+		];
+		
+		foreach ($files as $before => $after)
+			$this->assertEquals(fix_youtube_dl($before), $after);
+	}
 }

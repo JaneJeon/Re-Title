@@ -110,7 +110,7 @@ function fix_youtube_dl(string $filename): string {
 }
 
 function absolutePath(string $path): string {
-	return $path[0] !== '~' ? $path : posix_getpwuid(posix_getuid())['dir'].'/'.substr($path, 2);
+	return $path[0] !== '~' ? $path : posix_getpwuid(posix_getuid())['dir'].substr($path, 1);
 }
 
 # -------------------- main --------------------
@@ -137,9 +137,8 @@ if (!debug_backtrace()) {
 		foreach ($toDelete as $file)
 			unlink($file);
 		if (is_dir($base)) {
-			foreach (fixSingleFolders($base) as $oldFile => $newFile) {
+			foreach (fixSingleFolders($base) as $oldFile => $newFile)
 				rename($oldFile, $newFile);
-			}
 			# TODO: fix 'No such file or directory' error (it still works, but will throw the error for some reason)
 			foreach (fixFolders($base) as $oldDir => $newDir)
 				rename($oldDir, $newDir);
@@ -149,5 +148,5 @@ if (!debug_backtrace()) {
 		foreach ($toFix as $oldFile => $newFile)
 			rename($oldFile, $newFile);
 	
-	echo 'Took '.round((microtime(true) - $start), 2)." seconds.\n";
+	echo 'Took '.round(microtime(true) - $start, 2)." seconds.\n";
 }

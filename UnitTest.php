@@ -2,7 +2,7 @@
 require 'vendor/autoload.php';
 use PHPUnit\Framework\TestCase;
 
-class AnimeTitleTest extends TestCase {
+class UnitTest extends TestCase {
 	public function testFixTitle() {
 		$titles = [
 			'[bonkai77] Ghost in the Shell Stand Alone Complex - 1x01 - Section 9  [1080p][x265]' =>

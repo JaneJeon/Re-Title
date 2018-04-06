@@ -17,9 +17,11 @@ function fixTitle(string $title): string {
 }
 
 # returns the fixed pathname of a given anime file
-function fixFile(string $oldPath, $anime = true): string {
+function fixFile(string $oldPath, string $option): string {
+	echo "Fixing $oldPath with option $option\n";
 	$path = pathinfo($oldPath);
-	$fixed = $anime ? fixTitle($path['filename']) : fix_youtube_dl($path['filename']);
+	$fixed = $option == 't' ? fixTitle($path['filename'])
+		: $option == 'y' ? fix_youtube_dl($path['filename']) : fix_imgur($path['filename']);
 	return $path['dirname'].'/'.$fixed.'.'.$path['extension'];
 }
 
@@ -32,20 +34,26 @@ function getFiles(string $dir): array {
 }
 
 # returns ['file to fix' => 'fixed path'], ['files to be deleted']
-function fix(string $path, $anime = true): array {
+function fix(string $path, string $option): array {
 	$toFix = [];
 	$toDelete = [];
+	$anime = $option == 't';
 	
 	if (is_file($path)) {
-		# queue to delete anything that isn't the right format
-		if (!in_array($extension = pathinfo($path, PATHINFO_EXTENSION), fileFormats) && $anime)
-			$toDelete[] = $path;
-		else if (in_array($extension, animeFormats) && ($newPath = fixFile($path, $anime)) != $path)
+		if ($anime) {
+			# queue to delete anything that isn't the right format
+			if (!in_array($extension = pathinfo($path, PATHINFO_EXTENSION), fileFormats))
+				$toDelete[] = $path;
+			else if (!in_array($extension, animeFormats))
+				return [$toFix, $toDelete];
+		}
+		
+		if (($newPath = fixFile($path, $option)) != $path)
 			$toFix[$path] = $newPath;
 	} else
 		# recursively check all of the subfolders & files
 		foreach (getFiles($path) as $subPath) {
-			list($toFix2, $toDelete2) = fix($subPath, $anime);
+			list($toFix2, $toDelete2) = fix($subPath, $option);
 			$toFix = array_merge($toFix, $toFix2);
 			if ($anime) $toDelete = array_merge($toDelete, $toDelete2);
 		}
@@ -109,6 +117,10 @@ function fix_youtube_dl(string $filename): string {
 	return preg_replace('/-\S{11}$/', '', $filename);
 }
 
+function fix_imgur(string $filename): string {
+	return preg_replace('/ - \S{7}$/', '', $filename);
+}
+
 function absolutePath(string $path): string {
 	return $path[0] !== '~' ? $path : posix_getpwuid(posix_getuid())['dir'].substr($path, 1);
 }
@@ -124,16 +136,17 @@ if (!debug_backtrace()) {
 	
 	$error = '';
 	do {
-		$anime = readline($error.'Fix anime (t)orrents or (y)outube_dl downloads? ');
-		$error = 'Not a valid option! ';
-	} while ($anime != 't' && $anime != 'y');
+		$option = readline($error.'Fix anime (t)orrents, (y)outube_dl downloads or (i)mgur files? ');
+		$error  = 'Not a valid option! ';
+	} while ($option != 't' && $option != 'y' && $option != 'i');
 	
 	$start = microtime(true);
-	list($toFix, $toDelete) = fix($base, $anime == 't');
+	list($toFix, $toDelete) = fix($base, $option);
 	
-	if ($anime == 't') {
-		foreach ($toFix as $oldFile => $newFile)
-			rename($oldFile, $newFile);
+	foreach ($toFix as $oldFile => $newFile)
+		rename($oldFile, $newFile);
+	
+	if ($option == 't') {
 		foreach ($toDelete as $file)
 			unlink($file);
 		if (is_dir($base)) {
@@ -144,9 +157,7 @@ if (!debug_backtrace()) {
 				rename($oldDir, $newDir);
 			# TODO: clear out any empty directories (I guess I'll have to make one more pass, huh)
 		}
-	} else
-		foreach ($toFix as $oldFile => $newFile)
-			rename($oldFile, $newFile);
+	}
 	
 	echo 'Took '.round(microtime(true) - $start, 2)." seconds.\n";
 }
